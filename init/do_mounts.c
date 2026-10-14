@@ -30,7 +30,7 @@
 
 int root_mountflags = MS_RDONLY | MS_SILENT;
 static char __initdata saved_root_name[64];
-static int root_wait;
+static int root_wait = -1; /* default to rootwait for slow mmc detection */
 
 dev_t ROOT_DEV;
 

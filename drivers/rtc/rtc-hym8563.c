@@ -406,7 +406,7 @@ static struct clk *hym8563_clkout_register_clk(struct hym8563 *hym8563)
 
 	init.name = "hym8563-clkout";
 	init.ops = &hym8563_clkout_ops;
-	init.flags = CLK_IS_CRITICAL;
+	init.flags = 0;
 	init.parent_names = NULL;
 	init.num_parents = 0;
 	hym8563->clkout_hw.init = &init;
@@ -447,11 +447,11 @@ static irqreturn_t hym8563_irq(int irq, void *dev_id)
 		goto out;
 	}
 
-	dev_info(&client->dev, "%s: irq stat 0x%x\n", __func__, data);
+	dev_dbg(&client->dev, "%s: irq stat 0x%x\n", __func__, data);
 	data &= ~HYM8563_CTL2_AF;
-	/*clean timer irq and reset timer count down*/
+	/* Clean timer irq flag and the undocumented bit 6 (0x40) */
 	data &= ~HYM8563_CTL2_TF;
-	i2c_smbus_write_byte_data(client, HYM8563_TMR_CNT, 0);
+	data &= ~0x40;
 
 	ret = i2c_smbus_write_byte_data(client, HYM8563_CTL2, data);
 	if (ret < 0) {
@@ -495,9 +495,30 @@ static int hym8563_init_device(struct i2c_client *client)
 
 	ret &= ~HYM8563_CTL2_TI_TP;
 
-	/* Reset timer cnt and Set timer countdown 1s per count */
-	i2c_smbus_write_byte_data(client, HYM8563_TMR_CNT, 0);
-	i2c_smbus_write_byte_data(client, HYM8563_TMR_CTL, HYM8563_TMR_CFG);
+	ret = i2c_smbus_write_byte_data(client, HYM8563_CTL2, ret);
+	if (ret < 0)
+		return ret;
+
+	/* Explicitly stop and disable the countdown timer.
+	 * U-Boot or a previous kernel may have left the timer running,
+	 * which causes continuous level-triggered IRQ storms because
+	 * the TF flag keeps re-asserting every time the driver clears it.
+	 * Writing 0 to TMR_CTL disables the timer (clears ENABLE bit).
+	 */
+	ret = i2c_smbus_write_byte_data(client, HYM8563_TMR_CTL, 0);
+	if (ret < 0)
+		return ret;
+
+	/* Also clear bit 6 (0x40) which is an undocumented timer-related
+	 * flag on some HYM8563 clones that the standard TF clear doesn't
+	 * cover.  Re-read CTL2 and clear any stray bits.
+	 */
+	ret = i2c_smbus_read_byte_data(client, HYM8563_CTL2);
+	if (ret < 0)
+		return ret;
+	ret &= ~(HYM8563_CTL2_AF | HYM8563_CTL2_TF | HYM8563_CTL2_TI_TP);
+	ret &= ~0x40;  /* clear undocumented timer-active bit on clones */
+	ret &= ~(HYM8563_CTL2_AIE | HYM8563_CTL2_TIE);
 
 	return i2c_smbus_write_byte_data(client, HYM8563_CTL2, ret);
 }
