@@ -277,6 +277,20 @@
 		WIFI,poweren-gpios = <&gpio1 RK_PA5 GPIO_ACTIVE_HIGH>;
 		status = "okay";
 	};
+
+	wireless_bluetooth: wireless-bluetooth {
+		compatible = "bluetooth-platdata";
+		clocks = <&hym8563>;
+		clock-names = "ext_clock";
+		uart_rts_gpios = <&gpio4 RK_PC4 GPIO_ACTIVE_LOW>;
+		pinctrl-names = "default", "rts_gpio";
+		pinctrl-0 = <&uart9m0_rtsn &bt_reset_gpio &bt_wake_gpio &bt_irq_gpio>;
+		pinctrl-1 = <&uart9_rts_gpio>;
+		BT,reset-gpios = <&gpio2 RK_PC1 GPIO_ACTIVE_HIGH>;
+		BT,wake-gpios = <&gpio1 RK_PC4 GPIO_ACTIVE_HIGH>;
+		BT,wake_host-gpios = <&gpio0 RK_PA0 GPIO_ACTIVE_HIGH>;
+		status = "okay";
+	};
 };
 
 &combphy0_ps {
@@ -664,6 +678,7 @@
 	smdt_wdt: watchdog@62 {
 		compatible = "smdt,mcu-wdt";
 		reg = <0x62>;
+		status = "okay";
 	};
 };
 
@@ -771,6 +786,24 @@
 };
 
 &pinctrl {
+	bluetooth {
+		bt_reset_gpio: bt-reset-gpio {
+			rockchip,pins = <2 RK_PC1 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+
+		bt_wake_gpio: bt-wake-gpio {
+			rockchip,pins = <1 RK_PC4 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+
+		bt_irq_gpio: bt-irq-gpio {
+			rockchip,pins = <0 RK_PA0 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+
+		uart9_rts_gpio: uart9-rts-gpio {
+			rockchip,pins = <4 RK_PC4 RK_FUNC_GPIO &pcfg_pull_none>;
+		};
+	};
+
 	hdmi {
 		hdmi1_tx_on_h: hdmi1-tx-on-h {
 			rockchip,pins = <1 RK_PC6 RK_FUNC_GPIO &pcfg_pull_none>;
@@ -1363,6 +1396,12 @@
 	status = "okay";
 };
 
+&uart9 {
+	pinctrl-names = "default";
+	pinctrl-0 = <&uart9m0_xfer>;
+	status = "okay";
+};
+
 /*
 
  * usb_host2_xhci removed — does not exist in the vendor
@@ -1386,5 +1425,5 @@
 };
 
 &wdt {
-	status = "disabled";
+	status = "okay";
 };

@@ -214,7 +214,6 @@ static int smdt_wdt_probe(struct i2c_client *client)
 	watchdog_set_drvdata(&wdt->wdd, wdt);
 	i2c_set_clientdata(client, wdt);
 
-	watchdog_stop_on_reboot(&wdt->wdd);
 	watchdog_stop_on_unregister(&wdt->wdd);
 	set_bit(WDOG_HW_RUNNING, &wdt->wdd.status);
 
@@ -247,6 +246,25 @@ static void smdt_wdt_remove(struct i2c_client *client)
 	debugfs_remove_recursive(wdt->debugfs_dir);
 }
 
+static void smdt_wdt_shutdown(struct i2c_client *client)
+{
+	struct smdt_wdt *wdt = i2c_get_clientdata(client);
+
+	if (!wdt)
+		return;
+
+	/*
+	 * Only stop the kernel feed work.  Do NOT attempt any I2C writes
+	 * during shutdown — the I2C controller may already be powered off,
+	 * and i2c_transfer would block forever, hanging the reboot.
+	 *
+	 * The MCU watchdog will fire after its timeout (60 s) if the reboot
+	 * doesn't complete, which is the desired safety behaviour.
+	 */
+	cancel_delayed_work_sync(&wdt->feed_work);
+	dev_info(&client->dev, "SMDT MCU watchdog feed stopped for shutdown\n");
+}
+
 static const struct of_device_id smdt_wdt_dt_ids[] = {
 	{ .compatible = "smdt,mcu-wdt", },
 	{ }
@@ -266,6 +284,7 @@ static struct i2c_driver smdt_wdt_driver = {
 	},
 	.probe = smdt_wdt_probe,
 	.remove = smdt_wdt_remove,
+	.shutdown = smdt_wdt_shutdown,
 	.id_table = smdt_wdt_id,
 };
 module_i2c_driver(smdt_wdt_driver);

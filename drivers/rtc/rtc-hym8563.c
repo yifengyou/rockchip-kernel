@@ -590,7 +590,7 @@ static int hym8563_probe(struct i2c_client *client)
 
 		ret = devm_request_threaded_irq(&client->dev, client->irq,
 						NULL, hym8563_irq,
-						irqflags | IRQF_ONESHOT,
+						irqflags | IRQF_ONESHOT | IRQF_NO_AUTOEN,
 						client->name, hym8563);
 		if (ret < 0) {
 			dev_err(&client->dev, "irq %d request failed, %d\n",
