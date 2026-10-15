@@ -295,6 +295,7 @@
 	phy-mode = "rgmii-rxid";
 	tx_delay = <0x43>;
 	phy-handle = <&rgmii_phy1>;
+	local-mac-address = [00 e0 4c 68 00 01];
 	/*
 	 * The dwmac-rk driver unconditionally looks up mac_clk_rx,
 	 * mac_clk_tx, and clk_mac_speed by name.  The RK3588 CRU has
@@ -809,7 +810,7 @@
 
 &pwm1 {
 	pinctrl-0 = <&pwm1m1_pins>;
-	pinctrl-names = "default";
+	pinctrl-names = "active";
 	status = "okay";
 };
 
