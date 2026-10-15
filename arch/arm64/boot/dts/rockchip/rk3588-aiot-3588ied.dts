@@ -48,15 +48,45 @@
 
 	adc-keys-0 {
 		compatible = "adc-keys";
-		io-channels = <&saradc 0>;
+		io-channels = <&saradc 1>;
 		io-channel-names = "buttons";
 		keyup-threshold-microvolt = <1800000>;
 		poll-interval = <100>;
 
-		button-maskrom {
-			label = "Mask Rom";
-			linux,code = <KEY_SETUP>;
-			press-threshold-microvolt = <2000>;
+		vol-up-key {
+			label = "volume up";
+			linux,code = <KEY_VOLUMEUP>;
+			press-threshold-microvolt = <176000>;
+		};
+
+		vol-down-key {
+			label = "volume down";
+			linux,code = <KEY_VOLUMEDOWN>;
+			press-threshold-microvolt = <417000>;
+		};
+
+		menu-key {
+			label = "menu";
+			linux,code = <KEY_MENU>;
+			press-threshold-microvolt = <894000>;
+		};
+
+		back-key {
+			label = "back";
+			linux,code = <KEY_BACK>;
+			press-threshold-microvolt = <1235000>;
+		};
+	};
+
+	gpio-keys {
+		compatible = "gpio-keys";
+		autorepeat;
+
+		recovery {
+			debounce-interval = <100>;
+			gpios = <&gpio1 RK_PB1 GPIO_ACTIVE_LOW>;
+			label = "GPIO RECOVERY";
+			linux,code = <KEY_F8>;
 		};
 	};
 
@@ -83,18 +113,29 @@
 		compatible = "gpio-leds";
 
 		sys_led: led-0 {
-			gpios = <&gpio2 RK_PB7 GPIO_ACTIVE_HIGH>;
-			label = "system-led";
+			gpios = <&nca9555 8 GPIO_ACTIVE_HIGH>;
+			label = "sys";
 			linux,default-trigger = "heartbeat";
-			pinctrl-names = "default";
-			pinctrl-0 = <&sys_led_pin>;
+			default-state = "on";
 		};
 
-		usr_led: led-1 {
-			gpios = <&gpio2 RK_PC0 GPIO_ACTIVE_HIGH>;
-			label = "user-led";
-			pinctrl-names = "default";
-			pinctrl-0 = <&usr_led_pin>;
+		pwr_led: led-1 {
+			gpios = <&nca9555 7 GPIO_ACTIVE_HIGH>;
+			label = "pwr";
+			default-state = "on";
+		};
+
+		data_led: led-2 {
+			gpios = <&nca9555 4 GPIO_ACTIVE_HIGH>;
+			label = "data";
+			linux,default-trigger = "mmc0";
+			default-state = "off";
+		};
+
+		fourg_led: led-3 {
+			gpios = <&nca9555 1 GPIO_ACTIVE_HIGH>;
+			label = "4g";
+			default-state = "off";
 		};
 	};
 
@@ -730,16 +771,6 @@
 };
 
 &pinctrl {
-	gpio-leds {
-		sys_led_pin: sys-led-pin {
-			rockchip,pins = <2 RK_PB7 RK_FUNC_GPIO &pcfg_pull_none>;
-		};
-
-		usr_led_pin: usr-led-pin {
-			rockchip,pins = <2 RK_PC0 RK_FUNC_GPIO &pcfg_pull_none>;
-		};
-	};
-
 	hdmi {
 		hdmi1_tx_on_h: hdmi1-tx-on-h {
 			rockchip,pins = <1 RK_PC6 RK_FUNC_GPIO &pcfg_pull_none>;
