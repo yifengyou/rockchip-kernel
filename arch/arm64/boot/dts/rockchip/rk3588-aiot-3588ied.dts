@@ -336,6 +336,17 @@
 
 &gpu {
 	mali-supply = <&vdd_gpu_s0>;
+	mem-supply = <&vdd_gpu_mem_s0>;
+	status = "okay";
+};
+
+&rknpu {
+	rknpu-supply = <&vdd_npu_s0>;
+	mem-supply = <&vdd_npu_mem_s0>;
+	status = "okay";
+};
+
+&rknpu_mmu {
 	status = "okay";
 };
 
@@ -471,7 +482,7 @@
 	pinctrl-names = "default";
 	status = "okay";
 
-	vdd_npu_s0: regulator@42 {
+	vdd_npu_s0: vdd_npu_mem_s0: regulator@42 {
 		compatible = "rockchip,rk8602";
 		reg = <0x42>;
 		fcs,suspend-voltage-selector = <1>;
