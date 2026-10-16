@@ -226,7 +226,6 @@ static int hym8563_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alm)
 	time64_t now, alarm, interval;
 	u8 buf[4];
 	int ret;
-	u8 cnt;
 
 	ret = i2c_smbus_write_byte_data(client, HYM8563_TMR_CNT, 0);
 	if (ret < 0)
@@ -242,52 +241,23 @@ static int hym8563_rtc_set_alarm(struct device *dev, struct rtc_wkalrm *alm)
 	alarm = rtc_tm_to_time64(alm_tm);
 	now = rtc_tm_to_time64(&tm);
 	interval = alarm - now;
-	if (interval <= 0) {
-		ret = -EINVAL;
-		return ret;
-	}
 
 	/* store alarm tm_sec */
 	hym8563->alarm_tm_sec = alm_tm->tm_sec;
 
 	dev_info(dev, "%s: now:    %ptR\n", __func__, &tm);
 	dev_info(dev, "%s: expired:%ptR\n", __func__, alm_tm);
-	if (interval <= HYM8563_TMR_MAXCNT) {
+	if (interval < HYM8563_TMR_MAXCNT) {
 		hym8563->alarm_or_timer_irq = 1;
-		/* 1Hz timer, max 255s */
-		ret = i2c_smbus_write_byte_data(client, HYM8563_TMR_CNT, (u8)interval);
-		if (ret < 0)
-			return ret;
-		ret = i2c_smbus_write_byte_data(client, HYM8563_TMR_CTL,
-						HYM8563_TMR_CTL_ENABLE | HYM8563_TMR_CTL_1);
-		if (ret < 0)
-			return ret;
-		dev_info(&client->dev, "%s: set 1Hz timer, %ds\n",
-			 __func__, (u8)interval);
-	} else if (interval <= HYM8563_TMR_MAXCNT * 60) {
-		u64 tmp;
-
-		hym8563->alarm_or_timer_irq = 1;
-		/* 1/60Hz timer, max 255*60=15300s (~4.25h) */
-		tmp = interval + 59;
-		do_div(tmp, 60);
-		cnt = (u8)tmp;
-
-		ret = i2c_smbus_write_byte_data(client, HYM8563_TMR_CNT, cnt);
-		if (ret < 0)
-			return ret;
-		ret = i2c_smbus_write_byte_data(client, HYM8563_TMR_CTL,
-						HYM8563_TMR_CTL_ENABLE | HYM8563_TMR_CTL_1_60);
-		if (ret < 0)
-			return ret;
-		dev_info(&client->dev, "%s: set 1/60Hz timer, cnt=%u (~%lds)\n",
-			 __func__, cnt, (unsigned long)cnt * 60);
+		/* set timer */
+		i2c_smbus_write_byte_data(client, HYM8563_TMR_CNT, (u8)interval);
+		dev_info(&client->dev, "%s: set %dm%ds timer, interval=%ds\n",
+			 __func__, ((u8)interval)/60, ((u8)interval)%60, (u8)interval);
 	} else {
 		hym8563->alarm_or_timer_irq = 0;
-		dev_warn(dev, "%s: interval %llds > %ds, alarm mode unreliable\n",
-			 __func__, interval, HYM8563_TMR_MAXCNT * 60);
 		/* set alarm */
 		alm_tm->tm_sec = 0;
+		dev_info(dev, "%s: set alarm %ptR\n", __func__, alm_tm);
 	}
 
 	buf[0] = (alm_tm->tm_min < 60 && alm_tm->tm_min >= 0) ?
@@ -354,7 +324,7 @@ static long hym8563_clkout_round_rate(struct clk_hw *hw, unsigned long rate,
 		if (clkout_rates[i] <= rate)
 			return clkout_rates[i];
 
-	return clkout_rates[0];
+	return 0;
 }
 
 static int hym8563_clkout_set_rate(struct clk_hw *hw, unsigned long rate,
@@ -477,11 +447,10 @@ static irqreturn_t hym8563_irq(int irq, void *dev_id)
 		goto out;
 	}
 
-	dev_info(&client->dev, "%s: irq stat 0x%x\n", __func__, data);
+	dev_dbg(&client->dev, "%s: irq stat 0x%x\n", __func__, data);
 	data &= ~HYM8563_CTL2_AF;
-	/*clean timer irq and reset timer count down*/
 	data &= ~HYM8563_CTL2_TF;
-	i2c_smbus_write_byte_data(client, HYM8563_TMR_CNT, 0);
+	data &= ~0x40;		/* clear undocumented timer-active flag on clones */
 
 	ret = i2c_smbus_write_byte_data(client, HYM8563_CTL2, data);
 	if (ret < 0) {
@@ -525,9 +494,19 @@ static int hym8563_init_device(struct i2c_client *client)
 
 	ret &= ~HYM8563_CTL2_TI_TP;
 
-	/* Reset timer cnt and Set timer countdown 1s per count */
+	/*
+	 * Explicitly stop and disable the countdown timer.
+	 * The original vendor code enables the timer here (TMR_CTL = TMR_CFG),
+	 * but this board's HYM8563 clone has an undocumented bit 6 (0x40) in
+	 * CTL2 that mirrors timer activity.  With the timer running, bit 0x40
+	 * is constantly re-asserted, and because the IRQ is level-low triggered,
+	 * this causes an unstoppable interrupt storm.
+	 *
+	 * We still keep CLK_IS_CRITICAL on the clkout so the 32.768 kHz LPO
+	 * clock (needed by the WiFi module) stays enabled.
+	 */
 	i2c_smbus_write_byte_data(client, HYM8563_TMR_CNT, 0);
-	i2c_smbus_write_byte_data(client, HYM8563_TMR_CTL, HYM8563_TMR_CFG);
+	i2c_smbus_write_byte_data(client, HYM8563_TMR_CTL, 0);
 
 	return i2c_smbus_write_byte_data(client, HYM8563_CTL2, ret);
 }
@@ -604,9 +583,14 @@ static int hym8563_probe(struct i2c_client *client)
 	}
 
 	if (client->irq > 0) {
+		unsigned long irqflags = IRQF_TRIGGER_LOW;
+
+		if (dev_fwnode(&client->dev))
+			irqflags = 0;
+
 		ret = devm_request_threaded_irq(&client->dev, client->irq,
 						NULL, hym8563_irq,
-						IRQF_TRIGGER_LOW | IRQF_ONESHOT,
+						irqflags | IRQF_ONESHOT | IRQF_NO_AUTOEN,
 						client->name, hym8563);
 		if (ret < 0) {
 			dev_err(&client->dev, "irq %d request failed, %d\n",
