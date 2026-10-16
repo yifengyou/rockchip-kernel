@@ -75,8 +75,7 @@ jobs:
           ls -alh
           sudo chown -R root:root .
           sudo ./kdev-build.sh
-          sudo mkdir -p /builder/release
-          sudo cp output/* /builder/release
+          ls -alh  /builder/release/*
 
       - name: List build output
         run: |

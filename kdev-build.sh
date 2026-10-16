@@ -344,3 +344,4 @@ ls -alh "${WORKDIR}/release/"
 echo ""
 echo "Build completed successfully!"
 exit 0
+
