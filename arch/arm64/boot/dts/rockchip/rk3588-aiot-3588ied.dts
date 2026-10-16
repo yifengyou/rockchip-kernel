@@ -496,7 +496,7 @@
 };
 
 &display_subsystem {
-	clocks = <&hdptxphy1>;
+	clocks = <&hdptxphy_hdmi1>;
 	clock-names = "hdmi1_phy_pll";
 };
 
@@ -525,6 +525,10 @@
 };
 
 &hdptxphy1 {
+	status = "disabled";
+};
+
+&hdptxphy_hdmi1 {
 	status = "okay";
 };
 

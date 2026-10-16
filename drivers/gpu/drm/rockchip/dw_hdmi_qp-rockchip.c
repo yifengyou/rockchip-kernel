@@ -2695,20 +2695,20 @@ secondary:
 		if (rockchip_drm_bus_fmt_is_yuv420(hdmi->output_bus_format))
 			bus_width /= 2;
 
-		phy_cfg.tmds_char_rate = bus_width * 1000;
+		/* convert kHz to 100Hz units for phy_set_bus_width */
+		bus_width *= 10;
 		phy_hdmi_mode = PHY_HDMI_MODE_TMDS;
 
 		if (color_depth == 10 &&
 		    !rockchip_drm_bus_fmt_is_yuv422(hdmi->output_bus_format))
-			phy_cfg.bpc = 10;
+			bus_width |= COLOR_DEPTH_10BIT;
 		else
 			phy_cfg.bpc = 8;
 	}
 
 	if (hdmi->phy) {
 		phy_set_mode_ext(hdmi->phy, PHY_MODE_HDMI, phy_hdmi_mode);
-		phy_configure(hdmi->phy, (void *)&phy_cfg);
-		phy_set_bus_width(hdmi->phy, hdmi->phy_bus_width);
+		phy_set_bus_width(hdmi->phy, bus_width);
 	}
 
 	s->output_type = DRM_MODE_CONNECTOR_HDMIA;
