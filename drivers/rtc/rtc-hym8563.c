@@ -447,11 +447,10 @@ static irqreturn_t hym8563_irq(int irq, void *dev_id)
 		goto out;
 	}
 
-	dev_info(&client->dev, "%s: irq stat 0x%x\n", __func__, data);
+	dev_dbg(&client->dev, "%s: irq stat 0x%x\n", __func__, data);
 	data &= ~HYM8563_CTL2_AF;
-	/*clean timer irq and reset timer count down*/
 	data &= ~HYM8563_CTL2_TF;
-	i2c_smbus_write_byte_data(client, HYM8563_TMR_CNT, 0);
+	data &= ~0x40;		/* clear undocumented timer-active flag on clones */
 
 	ret = i2c_smbus_write_byte_data(client, HYM8563_CTL2, data);
 	if (ret < 0) {
@@ -495,9 +494,19 @@ static int hym8563_init_device(struct i2c_client *client)
 
 	ret &= ~HYM8563_CTL2_TI_TP;
 
-	/* Reset timer cnt and Set timer countdown 1s per count */
+	/*
+	 * Explicitly stop and disable the countdown timer.
+	 * The original vendor code enables the timer here (TMR_CTL = TMR_CFG),
+	 * but this board's HYM8563 clone has an undocumented bit 6 (0x40) in
+	 * CTL2 that mirrors timer activity.  With the timer running, bit 0x40
+	 * is constantly re-asserted, and because the IRQ is level-low triggered,
+	 * this causes an unstoppable interrupt storm.
+	 *
+	 * We still keep CLK_IS_CRITICAL on the clkout so the 32.768 kHz LPO
+	 * clock (needed by the WiFi module) stays enabled.
+	 */
 	i2c_smbus_write_byte_data(client, HYM8563_TMR_CNT, 0);
-	i2c_smbus_write_byte_data(client, HYM8563_TMR_CTL, HYM8563_TMR_CFG);
+	i2c_smbus_write_byte_data(client, HYM8563_TMR_CTL, 0);
 
 	return i2c_smbus_write_byte_data(client, HYM8563_CTL2, ret);
 }
@@ -581,7 +590,7 @@ static int hym8563_probe(struct i2c_client *client)
 
 		ret = devm_request_threaded_irq(&client->dev, client->irq,
 						NULL, hym8563_irq,
-						irqflags | IRQF_ONESHOT,
+						irqflags | IRQF_ONESHOT | IRQF_NO_AUTOEN,
 						client->name, hym8563);
 		if (ret < 0) {
 			dev_err(&client->dev, "irq %d request failed, %d\n",

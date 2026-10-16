@@ -3915,7 +3915,8 @@ static void dw_hdmi_rockchip_encoder_mode_set(struct drm_encoder *encoder,
 		if (hdmi->link_cfg.dsc_mode)
 			dw_hdmi_qp_dsc_configure(hdmi, s, crtc->state);
 
-		phy_set_bus_width(hdmi->phy, hdmi->phy_bus_width);
+		if (hdmi->phy)
+			phy_set_bus_width(hdmi->phy, hdmi->phy_bus_width);
 	}
 
 	clk_set_rate(hdmi->phyref_clk, adj->crtc_clock * 1000);
