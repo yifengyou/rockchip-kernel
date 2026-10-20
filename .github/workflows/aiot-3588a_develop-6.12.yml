@@ -1,9 +1,9 @@
-name: AIoT 3588IED develop-6.12 Build
+name: AIoT 3588A develop-6.12 Build
 
 on:
   push:
     branches:
-      - aiot-3588ied_develop-6.12
+      - aiot-3588a_develop-6.12
   repository_dispatch:
   workflow_dispatch:
 
@@ -85,14 +85,14 @@ jobs:
       - name: Upload to Release
         uses: ncipollo/release-action@main
         with:
-          tag: aiot-3588ied_develop-6.12
+          tag: aiot-3588a_develop-6.12
           artifacts: /builder/release/*
           allowUpdates: true
           removeArtifacts: false
           replacesArtifacts: true
           token: ${{ secrets.GITHUB_TOKEN }}
           body: |
-            # 视美泰 AIoT-3588IED develop-6.12 内核镜像
+            # 视美泰 AIoT-3588A develop-6.12 内核镜像
 
             ## 免责声明
             #
