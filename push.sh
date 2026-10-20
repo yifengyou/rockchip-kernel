@@ -2,10 +2,10 @@
 
 set -ex
 
-TARGET_IP="${1:-192.168.33.43}"
+TARGET_IP="${1:-192.168.33.39}"
 TARGET_USER="root"
 TARGET_PASS="admin"
-REMOTE_DIR="/boot/kdev"
+REMOTE_DIR="/boot/rockchip-6.12"
 
 SSH_CMD="sshpass -p ${TARGET_PASS} ssh ${TARGET_USER}@${TARGET_IP}"
 RSYNC_CMD="sshpass -p ${TARGET_PASS} rsync -avz"
@@ -20,5 +20,5 @@ ${SSH_CMD} md5sum "${REMOTE_DIR}/*"
 ${SSH_CMD}   rm -rf /lib/modules/6.12.*
 ${RSYNC_CMD} kos/lib/modules/*           "${TARGET_USER}@${TARGET_IP}:/lib/modules/"
 
-${SSH_CMD} tree "/boot"
+${SSH_CMD} tmux new-session -d -s reboot_session 'reboot -f'
 
